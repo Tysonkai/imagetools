@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Tools</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            background-color: #f8f8f8;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #2a2a72;
+            color: white;
+            padding: 20px;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            height: 100vh;
+            overflow-y: auto;
+            width: calc(100% - 250px);
+        }
+        .tool-box {
+            background-color: white;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 70%;
+        }
+        .download-btn {
+            display: block;
+            margin: 10px auto;
+            background-color: #2a2a72;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            text-decoration: none;
+            text-align: center;
+        }
+        li.sidebar_title a {
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Image Tools</h2>
+        <ul>
+            <li class="sidebar_title"><a href="#">Home</a></li>
+            <li class="sidebar_title"><a href="#">AI Tools</a></li>
+        </ul>
+    </div>
+    
+    <div class="main-content">
+        <!-- Resize Image -->
+        <div class="tool-box">
+            <h2>Resize Image</h2>
+            <input type="file" id="resizeInput">
+            <input type="number" id="resizeWidth" placeholder="Width">
+            <input type="number" id="resizeHeight" placeholder="Height">
+            <button onclick="resizeImage()">Resize</button>
+            <canvas id="resizeCanvas"></canvas>
+            <a id="resizeDownload" class="download-btn" download="resized-image.png">Download</a>
+        </div>
+
+        <!-- Remove Background -->
+        <div class="tool-box">
+            <h2>Remove Background</h2>
+            <input type="file" id="bgInput">
+            <button onclick="removeBackground()">Remove Background</button>
+            <canvas id="bgCanvas"></canvas>
+            <a id="bgDownload" class="download-btn" download="no-background.png">Download</a>
+        </div>
+
+        <!-- Improve Image Quality -->
+        <div class="tool-box">
+            <h2>Improve Image Quality</h2>
+            <input type="file" id="qualityInput">
+            <button onclick="improveQuality()">Improve Quality</button>
+            <canvas id="qualityCanvas"></canvas>
+            <a id="qualityDownload" class="download-btn" download="improved-image.png">Download</a>
+        </div>
+
+        <!-- Image Compressor -->
+        <div class="tool-box">
+            <h2>Image Compressor</h2>
+            <input type="file" id="compressInput">
+            <button onclick="compressImage()">Compress</button>
+            <canvas id="compressCanvas"></canvas>
+            <a id="compressDownload" class="download-btn" download="compressed-image.jpg">Download</a>
+        </div>
+    </div>
+
+    <script>
+        function resizeImage() {
+            let file = document.getElementById("resizeInput").files[0];
+            let width = document.getElementById("resizeWidth").value;
+            let height = document.getElementById("resizeHeight").value;
+            
+            if (!file) return alert("Please select an image!");
+            
+            let img = new Image();
+            img.src = URL.createObjectURL(file);
+            
+            img.onload = function() {
+                let aspectRatio = img.width / img.height;
+                if (!width) width = height * aspectRatio;
+                if (!height) height = width / aspectRatio;
+
+                let canvas = document.getElementById("resizeCanvas");
+                let ctx = canvas.getContext("2d");
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                document.getElementById("resizeDownload").href = canvas.toDataURL();
+            };
+        }
+
+        async function removeBackground() {
+            let file = document.getElementById("bgInput").files[0];
+            if (!file) return alert("Please select an image!");
+            
+            let img = new Image();
+            img.src = URL.createObjectURL(file);
+            
+            img.onload = async function() {
+                let model = await bodyPix.load();
+                let segmentation = await model.segmentPerson(img);
+
+                let canvas = document.getElementById("bgCanvas");
+                let ctx = canvas.getContext("2d");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                ctx.drawImage(img, 0, 0);
+                let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                let data = imgData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    if (segmentation.data[i / 4] === 0) data[i + 3] = 0;
+                }
+                
+                ctx.putImageData(imgData, 0, 0);
+                document.getElementById("bgDownload").href = canvas.toDataURL();
+            };
+        }
+
+        function improveQuality() {
+            let file = document.getElementById("qualityInput").files[0];
+            if (!file) return alert("Please select an image!");
+            
+            let img = new Image();
+            img.src = URL.createObjectURL(file);
+            
+            img.onload = function() {
+                let canvas = document.getElementById("qualityCanvas");
+                let ctx = canvas.getContext("2d");
+                canvas.width = img.width * 1.5;
+                canvas.height = img.height * 1.5;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                document.getElementById("qualityDownload").href = canvas.toDataURL("image/png", 1.0);
+            };
+        }
+
+        function compressImage() {
+            let file = document.getElementById("compressInput").files[0];
+            if (!file) return alert("Please select an image!");
+
+            let img = new Image();
+            img.src = URL.createObjectURL(file);
+
+            img.onload = function() {
+                let canvas = document.getElementById("compressCanvas");
+                let ctx = canvas.getContext("2d");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                document.getElementById("compressDownload").href = canvas.toDataURL("image/jpeg", 0.5);
+            };
+        }
+    </script>
+</body>
+</html>
